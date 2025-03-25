@@ -1,4 +1,4 @@
-import { ventaProductos } from './bd.js';
+import { ventaProductos } from './bd-replica.js';
 import express from "express";
 
 const app = express();
@@ -11,14 +11,14 @@ app.get("/consulta", (req, res) => {
         return res.status(400).json({ error: "Parámetros inválidos" });
     }
     const responseMicro= consultaVenta(vendedorValor, productoValor) ;
-    console.log(`Llamado a Microservicio consulta 1. 
+    console.log(`Llamado a Microservicio consulta 2. 
     Parámetros de consulta: 
         Vendedor: ${vendedorValor} , Producto: ${productoValor}
     Respuesta: ${responseMicro}`);
     res.json({ mensaje: responseMicro});
 });
 
-const PORT = 3001;
+const PORT = 3002;
 app.listen(PORT, () => {
     console.log(`Servidor en http://0.0.0.0:${PORT}`);
 });
