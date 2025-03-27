@@ -1,7 +1,6 @@
-const clientes = [
-    1, 2, 3, 4,  5,
-    6, 7, 8, 9, 10
-  ];
+export const comision = [0.05, 0.07, 0.1, 0.15, 0.2];
+
+export const precioProducto = [10000,35000,23000,39000,55000];
 
 export const ventaProductos = [
     [ 4, 1, 1, 10, 10 ],

@@ -1,4 +1,4 @@
-import { ventaProductos } from "./bd.js";
+import { comision,precioProducto, ventaProductos } from "./bd.js";
 import express from "express";
 import axios from "axios";
 
@@ -31,39 +31,54 @@ app.listen(PORT, () => {
 });
 
 async function votingService( vendedor, producto) {
-  
+  const flag = setRandomFalse();
   try {
-    const { data: resultadoVenta1 } = await axios.get(`http://localhost:3001/consulta?vendedor=${vendedor}&producto=${producto}`);
-    const { data: resultadoVenta2 } = await axios.get(`http://localhost:3002/consulta?vendedor=${vendedor}&producto=${producto}`);
-    const { data: resultadoVenta3 } = await axios.get(`http://localhost:3003/consulta?vendedor=${vendedor}&producto=${producto}`);
+    const { data: resultadoVenta1 } = await axios.get(`http://localhost:3001/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[0]}`);
+    const { data: resultadoVenta2 } = await axios.get(`http://localhost:3002/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[1]}`);
+    const { data: resultadoVenta3 } = await axios.get(`http://localhost:3003/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[2]}`);
     
     console.log(resultadoVenta1, resultadoVenta2, resultadoVenta3);
-    const resultado = await logicaVoting([
-      resultadoVenta1.mensaje,
-      resultadoVenta2.mensaje,
-      resultadoVenta3.mensaje,
+    const resultadoCantidadProducto = await logicaVoting([
+      resultadoVenta1.cantidadProducto,
+      resultadoVenta2.cantidadProducto,
+      resultadoVenta3.cantidadProducto,
+    ]);
+
+    const resultadoComision = await logicaVotingComision([
+      resultadoVenta1.comison,
+      resultadoVenta2.comison,
+      resultadoVenta3.comison,
     ]);
     
-    if (resultado == -1) {
-      return "En este momento el servicio no está disponible. Intente más tarde";
-    } else {
+ 
       console.log(
         `Se entregó el resultado correcto: ${
-          ventaProductos[vendedor - 1][producto - 1] == resultado
+          ventaProductos[vendedor - 1][producto - 1] * precioProducto[producto - 1] * comision[producto - 1] == resultadoComision
         }`
       );
-      if (resultado==1){
-        return `El vendedor ${vendedor}, ha vendido una unidad del producto ${producto}`;
+      if (resultadoCantidadProducto==1){
+        return `El vendedor ${vendedor}, ha vendido una unidad del producto ${producto}. Su comision es de ${resultadoComision}`;
       }
-      return `El vendedor ${vendedor}, ha vendido ${resultado} unidades del producto ${producto}`;
-    }
+      return `El vendedor ${vendedor}, ha vendido ${resultadoCantidadProducto} unidades del producto ${producto}. Su comision es de ${resultadoComision}`;
   } catch (error) {
     console.error("Error en la consulta de ventas", error);
     return "Error al obtener datos de ventas";
   }
 }
 
-async function logicaVoting(array) {
+function logicaVoting(array) {
+  const [a, b, c] = array;
+
+  if (a === b || a === c) {
+    return a;
+  }
+  if (b === c) {
+    return b;
+  }
+  return -1;
+}
+
+async function logicaVotingComision(array) {
   const [a, b, c] = array;
 
   if (a === b || a === c) {
@@ -79,4 +94,11 @@ async function logicaVoting(array) {
   }
   await axios.get(`http://localhost:3004/?fallo=${4}`);
   return -1;
+}
+
+function setRandomFalse() {
+  let arr = [true, true, true]; 
+  let randomIndex = Math.floor(Math.random() * 3); 
+  arr[randomIndex] = false; 
+  return arr;
 }
