@@ -1,6 +1,6 @@
 # Reto 2: Lógica Voting
 
-Para iniciar todos los microservicios en el repositorio local ejecutar el comando
+Para iniciar probar todos los microservicios en el repositorio local es necesario cambiarse a la rama feat/localhost y posteriormente ejecutar el comando
 
 ```
 npm run start:all

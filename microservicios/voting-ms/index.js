@@ -1,104 +1,109 @@
-import { comision,precioProducto, ventaProductos } from "./bd.js";
-import express from "express";
 import axios from "axios";
+import { comision, precioProducto, ventaProductos } from "./bd.js";
 
-const app = express();
+export const handler = async (event) => {
+  const queryParams = event.queryStringParameters || {};
+  const vendedorValor = parseInt(queryParams.vendedor);
+  const productoValor = parseInt(queryParams.producto);
 
-app.get("/consulta", async (req, res) => { // Agregado async aquí
-  const vendedorValor = parseInt(req.query.vendedor);
-  const productoValor = parseInt(req.query.producto);
-  
-  console.log("Llamado a Microservicio Voting");
+  console.log(`Llamado a a Lambda Voting. Parámetros de consulta:  Vendedor: ${vendedorValor} , Producto: ${productoValor}`);
 
   if (isNaN(vendedorValor) || isNaN(productoValor)) {
-    return res.status(400).json({ error: "Parámetros inválidos" });
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "Parámetros inválidos" }),
+    };
   }
 
   try {
     const mensaje = await votingService(vendedorValor, productoValor);
-    console.log("Respuesta: ", mensaje);
-    res.json({ mensaje });
+    console.log("Respuesta:", mensaje);
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ mensaje }),
+    };
   } catch (error) {
     console.error("Error en votingService", error);
-    res.status(500).json({ error: "Error en el servicio" });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Error en el servicio" }),
+    };
   }
-});
+};
 
-
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor en http://0.0.0.0:${PORT}`);
-});
-
-async function votingService( vendedor, producto) {
+async function votingService(vendedor, producto) {
   const flag = setRandomFalse();
   try {
-    const { data: resultadoVenta1 } = await axios.get(`http://localhost:3001/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[0]}`);
-    const { data: resultadoVenta2 } = await axios.get(`http://localhost:3002/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[1]}`);
-    const { data: resultadoVenta3 } = await axios.get(`http://localhost:3003/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[2]}`);
-    
-    console.log(resultadoVenta1, resultadoVenta2, resultadoVenta3);
+    const [res1, res2, res3] = await Promise.all([
+      axios.get(`https://ndjbsoq6xjztv3qvzeqiugtuy40wzmrx.lambda-url.us-east-2.on.aws/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[0]}`),
+      axios.get(`https://lbwsmrcn622gskv7mklbimkz2y0aimjd.lambda-url.us-east-2.on.aws/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[1]}`),
+      axios.get(`https://ouzzwnkuln6hf5msmmnp3vb7xi0wgahn.lambda-url.us-east-2.on.aws/consulta?vendedor=${vendedor}&producto=${producto}&flag=${flag[2]}`),
+    ]);
+
     const resultadoCantidadProducto = await logicaVoting([
-      resultadoVenta1.cantidadProducto,
-      resultadoVenta2.cantidadProducto,
-      resultadoVenta3.cantidadProducto,
+      res1.data.cantidadProducto,
+      res2.data.cantidadProducto,
+      res3.data.cantidadProducto,
     ]);
 
     const resultadoComision = await logicaVotingComision([
-      resultadoVenta1.comison,
-      resultadoVenta2.comison,
-      resultadoVenta3.comison,
+      res1.data.comison,
+      res2.data.comison,
+      res3.data.comison,
     ]);
-    
- 
-      console.log(
-        `Se entregó el resultado correcto: ${
-          ventaProductos[vendedor - 1][producto - 1] * precioProducto[producto - 1] * comision[producto - 1] == resultadoComision
-        }`
-      );
-      if (resultadoCantidadProducto==1){
-        return `El vendedor ${vendedor}, ha vendido una unidad del producto ${producto}. Su comision es de ${resultadoComision}`;
-      }
-      return `El vendedor ${vendedor}, ha vendido ${resultadoCantidadProducto} unidades del producto ${producto}. Su comision es de ${resultadoComision}`;
+    console.log(
+      `Resultado correcto: ${
+        Math.round(ventaProductos[vendedor - 1][producto - 1] * precioProducto[producto - 1] * comision[producto - 1]) == resultadoComision
+      }`
+    );
+
+    if (resultadoCantidadProducto === 1) {
+      return `El vendedor ${vendedor}, ha vendido una unidad del producto ${producto}. Su comision es de ${resultadoComision}`;
+    }
+    return `El vendedor ${vendedor}, ha vendido ${resultadoCantidadProducto} unidades del producto ${producto}. Su comision es de ${resultadoComision}`;
   } catch (error) {
     console.error("Error en la consulta de ventas", error);
     return "Error al obtener datos de ventas";
   }
 }
 
-function logicaVoting(array) {
-  const [a, b, c] = array;
-
-  if (a === b || a === c) {
-    return a;
-  }
-  if (b === c) {
-    return b;
-  }
+function logicaVoting([a, b, c]) {
+  if (a === b || a === c) return a;
+  if (b === c) return b;
   return -1;
 }
 
-async function logicaVotingComision(array) {
-  const [a, b, c] = array;
-
+async function logicaVotingComision([a, b, c]) {
   if (a === b || a === c) {
     if (a !== b || a !== c) {
-      const msFallo = (a !== b ? 2 : 3);
-      await axios.get(`http://localhost:3004/?fallo=${msFallo}`);
+      const msFallo = a !== b ? 2 : 3;
+      notificacionFallo(msFallo);
     }
     return a;
   }
   if (b === c) {
-    await axios.get(`http://localhost:3004/?fallo=${1}`);
+    notificacionFallo(1);
     return b;
   }
-  await axios.get(`http://localhost:3004/?fallo=${4}`);
+  notificacionFallo(4);
   return -1;
 }
 
 function setRandomFalse() {
-  let arr = [true, true, true]; 
-  let randomIndex = Math.floor(Math.random() * 3); 
-  arr[randomIndex] = false; 
+  const arr = [true, true, true];
+  const i = Math.floor(Math.random() * 3);
+  arr[i] = false;
   return arr;
+}
+
+function notificacionFallo (componenteFallido) {
+  if(componenteFallido==1){
+      console.log('Fallo en microservicio 1');
+  }else if(componenteFallido==2){
+    console.log('Fallo en microservicio 2');
+  } else if(componenteFallido==3){
+    console.log('Fallo en microservicio 3');
+  } else if(componenteFallido==4){
+    console.log('Fallo general en el sistema. Estableciendo conexión con todos los microservicios ...');
+  }
 }
